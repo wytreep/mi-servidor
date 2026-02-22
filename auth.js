@@ -69,11 +69,50 @@ const token = jwt.sign(
                 res.json({
                     mensaje: "Login exitoso",
                     token: token,
-                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email}
+                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol}
                 })
             }
         )
     })
 
+
+    router.put("/cambiar-password", async function(req, res) {
+    const { passwordActual, passwordNueva } = req.body
+    const token = req.headers["authorization"]
+
+    if (!token) return res.status(401).json({ error: "Token requerido" })
+
+    try {
+        const decoded = jwt.verify(token, SECRET)
+
+        conexion.query(
+            "SELECT * FROM usuarios WHERE id = ?",
+            [decoded.id],
+            async function(error, resultados) {
+                if (error) return res.status(500).json({ error: "Error en el servidor" })
+
+                const usuario = resultados[0]
+                const passwordValida = await bcrypt.compare(passwordActual, usuario.password)
+
+                if (!passwordValida) {
+                    return res.status(400).json({ error: "Contraseña actual incorrecta" })
+                }
+
+                const hash = await bcrypt.hash(passwordNueva, 10)
+
+                conexion.query(
+                    "UPDATE usuarios SET password = ? WHERE id = ?",
+                    [hash, decoded.id],
+                    function(error) {
+                        if (error) return res.status(500).json({ error: "Error al actualizar" })
+                        res.json({ mensaje: "Contraseña actualizada correctamente" })
+                    }
+                )
+            }
+        )
+    } catch (error) {
+        res.status(401).json({ error: "Token inválido" })
+    }
+})
     return router
 }
