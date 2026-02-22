@@ -1,6 +1,11 @@
 const express = require("express")
+
 const mysql = require("mysql2")
 const app = express()
+const cors = require("cors")
+app.use(cors())
+const authRoutes = require("./auth")
+const verificarToken = require("./middleware")
 const PORT = 3000
 
 app.use(express.json())
@@ -20,7 +25,7 @@ conexion.connect(function(error) {
     console.log("Conectado a MySQL correctamente")
 })
 
-app.get("/productos", function(req, res) {
+app.get("/productos", verificarToken, function(req, res) {
     conexion.query("SELECT * FROM productos", function(error, resultados) {
         if (error) {
             res.status(500).json({ error: "Error en la base de datos" })
@@ -30,7 +35,7 @@ app.get("/productos", function(req, res) {
     })
 })
 // Obtener un producto por ID
-app.get("/productos/:id", function(req, res) {
+app.get("/productos/:id", verificarToken, function(req, res) {
     let id = req.params.id
     conexion.query("SELECT * FROM productos WHERE id = ?", [id], function(error, resultados) {
         if (error) {
@@ -46,7 +51,7 @@ app.get("/productos/:id", function(req, res) {
 })
 
 // Agregar un producto nuevo
-app.post("/productos", function(req, res) {
+app.post("/productos", verificarToken, function(req, res) {
     let { nombre, precio, stock } = req.body
     conexion.query(
         "INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
@@ -61,7 +66,7 @@ app.post("/productos", function(req, res) {
     )
 })
 // Actualizar producto
-app.put("/productos/:id", function(req, res) {
+app.put("/productos/:id", verificarToken, function(req, res) {
     let id = req.params.id
     let { nombre, precio, stock } = req.body
     conexion.query(
@@ -78,7 +83,7 @@ app.put("/productos/:id", function(req, res) {
 })
 
 // Eliminar producto
-app.delete("/productos/:id", function(req, res) {
+app.delete("/productos/:id", verificarToken, function(req, res) {
     let id = req.params.id
     conexion.query("DELETE FROM productos WHERE id = ?", [id], function(error, resultado) {
         if (error) {
@@ -88,6 +93,10 @@ app.delete("/productos/:id", function(req, res) {
         res.json({ mensaje: "Producto eliminado" })
     })
 })
+
+
+app.use("/auth", authRoutes(conexion))
+
 app.listen(PORT, function() {
     console.log("Servidor corriendo en http://localhost:3000")
 })
