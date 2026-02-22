@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken")
-const SECRET = "mi_clave_secreta_2026"
-
+const SECRET = process.env.JWT_SECRET
 function verificarToken(req, res, next) {
     const token = req.headers["authorization"]
 
@@ -17,4 +16,11 @@ function verificarToken(req, res, next) {
     }
 }
 
-module.exports = verificarToken
+function soloAdmin(req, res, next) {
+    if (req.usuario.rol !== "admin") {
+        return res.status(403).json({ error: "Acceso prohibido, se requiere rol de administrador" })
+    }
+    next()
+}
+
+module.exports = { verificarToken, soloAdmin }

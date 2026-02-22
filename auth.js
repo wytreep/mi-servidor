@@ -3,8 +3,7 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const router = express.Router()
 
-const SECRET = "mi_clave_secreta_2026"
-
+const SECRET = process.env.JWT_SECRET
 module.exports = function(conexion) {
 
     // Registro
@@ -61,16 +60,16 @@ module.exports = function(conexion) {
                     return res.status(401).json({ error: "Credenciales incorrectas" })
                 }
 
-                const token = jwt.sign(
-                    { id: usuario.id, email: usuario.email },
-                    SECRET,
-                    { expiresIn: "24h" }
-                )
+const token = jwt.sign(
+    { id: usuario.id, email: usuario.email, rol: usuario.rol },
+    SECRET,
+    { expiresIn: "24h" }
+)
 
                 res.json({
                     mensaje: "Login exitoso",
                     token: token,
-                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email }
+                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email}
                 })
             }
         )

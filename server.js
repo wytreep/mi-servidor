@@ -1,3 +1,4 @@
+require("dotenv").config()
 const express = require("express")
 
 const mysql = require("mysql2")
@@ -5,17 +6,20 @@ const app = express()
 const cors = require("cors")
 app.use(cors())
 const authRoutes = require("./auth")
-const verificarToken = require("./middleware")
-const PORT = 3000
+const { verificarToken, soloAdmin } = require("./middleware")
+
 
 app.use(express.json())
+const PORT = process.env.PORT
 
 const conexion = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "root",
-    database: "tienda"
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
 })
+
+
 
 conexion.connect(function(error) {
     if (error) {
@@ -51,7 +55,7 @@ app.get("/productos/:id", verificarToken, function(req, res) {
 })
 
 // Agregar un producto nuevo
-app.post("/productos", verificarToken, function(req, res) {
+app.post("/productos", verificarToken, soloAdmin, function(req, res) {
     let { nombre, precio, stock } = req.body
     conexion.query(
         "INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
@@ -66,7 +70,7 @@ app.post("/productos", verificarToken, function(req, res) {
     )
 })
 // Actualizar producto
-app.put("/productos/:id", verificarToken, function(req, res) {
+app.put("/productos/:id", verificarToken, soloAdmin, function(req, res) {
     let id = req.params.id
     let { nombre, precio, stock } = req.body
     conexion.query(
@@ -83,7 +87,7 @@ app.put("/productos/:id", verificarToken, function(req, res) {
 })
 
 // Eliminar producto
-app.delete("/productos/:id", verificarToken, function(req, res) {
+app.delete("/productos/:id", verificarToken, soloAdmin, function(req, res) {
     let id = req.params.id
     conexion.query("DELETE FROM productos WHERE id = ?", [id], function(error, resultado) {
         if (error) {
