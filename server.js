@@ -11,6 +11,15 @@ const { verificarToken, soloAdmin } = require("./middleware")
 
 app.use(express.json())
 app.use("/public", express.static("public"))
+app.get("/productos", verificarToken, function(req, res) {
+    conexion.query("SELECT * FROM productos", function(error, resultados) {
+        if (error) {
+            res.status(500).json({ error: "Error en la base de datos" })
+            return
+        }
+        res.json(resultados)
+    })
+})
 const PORT = process.env.PORT
 
 const conexion = mysql.createConnection({
@@ -214,27 +223,7 @@ app.get("/usuarios", verificarToken, soloAdmin, function(req, res) {
     )
 })
 
-app.get("/mis-pedidos", verificarToken, function(req, res) {
-    const usuario_id = req.usuario.id
-    conexion.query(
-        `SELECT p.id, p.total, p.estado, p.created_at,
-        JSON_ARRAYAGG(JSON_OBJECT(
-            'nombre', pi.nombre,
-            'precio', pi.precio,
-            'cantidad', pi.cantidad
-        )) as items
-        FROM pedidos p
-        JOIN pedido_items pi ON p.id = pi.pedido_id
-        WHERE p.usuario_id = ?
-        GROUP BY p.id
-        ORDER BY p.created_at DESC`,
-        [usuario_id],
-        function(error, resultados) {
-            if (error) return res.status(500).json({ error: "Error al obtener pedidos" })
-            res.json(resultados)
-        }
-    )
-})
+
 
 app.put("/usuarios/:id/rol", verificarToken, soloAdmin, function(req, res) {
     const { rol } = req.body
