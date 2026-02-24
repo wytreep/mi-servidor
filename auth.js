@@ -1,11 +1,11 @@
-
+const SECRET = process.env.JWT_SECRET
+console.log("JWT_SECRET cargado:", SECRET ? "sí" : "no")
 const express = require("express")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const router = express.Router()
 
-const SECRET = process.env.JWT_SECRET
-console.log("JWT_SECRET cargado:", SECRET ? "sí" : "no")
+
 module.exports = function(conexion) {
 
     // Registro
