@@ -1,9 +1,11 @@
+
 const express = require("express")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const router = express.Router()
 
 const SECRET = process.env.JWT_SECRET
+console.log("JWT_SECRET cargado:", SECRET ? "sí" : "no")
 module.exports = function(conexion) {
 
     // Registro
@@ -37,6 +39,7 @@ module.exports = function(conexion) {
 
     // Login
     router.post("/login", function(req, res) {
+        console.log("Intentando login con:", req.body.email)
         let { email, password } = req.body
 
         if (!email || !password) {
