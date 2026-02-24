@@ -76,7 +76,9 @@ module.exports = function(conexion) {
 
     // Cambiar contraseña
     router.put("/cambiar-password", async function(req, res) {
-        const SECRET = process.env.JWT_SECRET
+         const SECRET = process.env.JWT_SECRET
+    console.log("Cambiar password - SECRET existe:", SECRET ? "sí" : "no")
+    console.log("Token recibido:", req.headers["authorization"] ? "sí" : "no")
         const { passwordActual, passwordNueva } = req.body
         const token = req.headers["authorization"]
 
