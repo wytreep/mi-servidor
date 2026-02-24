@@ -75,6 +75,16 @@ app.get("/mis-pedidos", verificarToken, function(req, res) {
         }
     )
 })
+app.get("/productos", verificarToken, function(req, res) {
+    conexion.query("SELECT * FROM productos", function(error, resultados) {
+        if (error) {
+            console.log("Error en /productos:", error)
+            res.status(500).json({ error: "Error en la base de datos" })
+            return
+        }
+        res.json(resultados)
+    })
+})
 // Obtener un producto por ID
 app.get("/productos/:id", verificarToken, function(req, res) {
     let id = req.params.id
@@ -165,6 +175,15 @@ app.post("/pedidos", verificarToken, async function(req, res) {
                 [valores],
                 function(error) {
                     if (error) return res.status(500).json({ error: "Error al guardar items" })
+
+                    // Descontar stock
+                    items.forEach(function(item) {
+                        conexion.query(
+                            "UPDATE productos SET stock = stock - ? WHERE id = ?",
+                            [item.cantidad, item.id]
+                        )
+                    })
+
                     res.json({ mensaje: "Pedido creado correctamente", id: pedido_id })
                 }
             )
