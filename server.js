@@ -1,6 +1,8 @@
 require("dotenv").config()
 const express = require("express")
-
+require("dotenv").config()
+console.log("DB_HOST:", process.env.DB_HOST)
+console.log("PORT:", process.env.PORT)
 const mysql = require("mysql2")
 const app = express()
 const cors = require("cors")
