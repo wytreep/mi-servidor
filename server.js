@@ -31,14 +31,38 @@ conexion.connect(function(error) {
     console.log("Conectado a MySQL correctamente")
 })
 
-app.get("/productos", verificarToken, function(req, res) {
-    conexion.query("SELECT * FROM productos", function(error, resultados) {
-        if (error) {
-            res.status(500).json({ error: "Error en la base de datos" })
-            return
+app.get("/mis-pedidos", verificarToken, function(req, res) {
+    const usuario_id = req.usuario.id
+    conexion.query(
+        `SELECT p.id, p.total, p.estado, p.created_at
+        FROM pedidos p
+        WHERE p.usuario_id = ?
+        ORDER BY p.created_at DESC`,
+        [usuario_id],
+        function(error, pedidos) {
+            if (error) return res.status(500).json({ error: error.message })
+            
+            if (pedidos.length === 0) return res.json([])
+            
+            let completados = 0
+            const resultado = []
+            
+            pedidos.forEach(function(pedido) {
+                conexion.query(
+                    "SELECT nombre, precio, cantidad FROM pedido_items WHERE pedido_id = ?",
+                    [pedido.id],
+                    function(error, items) {
+                        if (error) items = []
+                        resultado.push({ ...pedido, items })
+                        completados++
+                        if (completados === pedidos.length) {
+                            res.json(resultado)
+                        }
+                    }
+                )
+            })
         }
-        res.json(resultados)
-    })
+    )
 })
 // Obtener un producto por ID
 app.get("/productos/:id", verificarToken, function(req, res) {
