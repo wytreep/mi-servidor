@@ -1,10 +1,7 @@
-const SECRET = process.env.JWT_SECRET
-console.log("JWT_SECRET cargado:", SECRET ? "sí" : "no")
 const express = require("express")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const router = express.Router()
-
 
 module.exports = function(conexion) {
 
@@ -18,7 +15,6 @@ module.exports = function(conexion) {
 
         try {
             const hash = await bcrypt.hash(password, 10)
-
             conexion.query(
                 "INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)",
                 [nombre, email, hash],
@@ -39,7 +35,7 @@ module.exports = function(conexion) {
 
     // Login
     router.post("/login", function(req, res) {
-        console.log("Intentando login con:", req.body.email)
+        const SECRET = process.env.JWT_SECRET
         let { email, password } = req.body
 
         if (!email || !password) {
@@ -63,59 +59,61 @@ module.exports = function(conexion) {
                     return res.status(401).json({ error: "Credenciales incorrectas" })
                 }
 
-const token = jwt.sign(
-    { id: usuario.id, email: usuario.email, rol: usuario.rol },
-    SECRET,
-    { expiresIn: "24h" }
-)
+                const token = jwt.sign(
+                    { id: usuario.id, email: usuario.email, rol: usuario.rol },
+                    SECRET,
+                    { expiresIn: "24h" }
+                )
 
                 res.json({
                     mensaje: "Login exitoso",
                     token: token,
-                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol}
+                    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol }
                 })
             }
         )
     })
 
-
+    // Cambiar contraseña
     router.put("/cambiar-password", async function(req, res) {
-    const { passwordActual, passwordNueva } = req.body
-    const token = req.headers["authorization"]
+        const SECRET = process.env.JWT_SECRET
+        const { passwordActual, passwordNueva } = req.body
+        const token = req.headers["authorization"]
 
-    if (!token) return res.status(401).json({ error: "Token requerido" })
+        if (!token) return res.status(401).json({ error: "Token requerido" })
 
-    try {
-        const decoded = jwt.verify(token, SECRET)
+        try {
+            const decoded = jwt.verify(token, SECRET)
 
-        conexion.query(
-            "SELECT * FROM usuarios WHERE id = ?",
-            [decoded.id],
-            async function(error, resultados) {
-                if (error) return res.status(500).json({ error: "Error en el servidor" })
+            conexion.query(
+                "SELECT * FROM usuarios WHERE id = ?",
+                [decoded.id],
+                async function(error, resultados) {
+                    if (error) return res.status(500).json({ error: "Error en el servidor" })
 
-                const usuario = resultados[0]
-                const passwordValida = await bcrypt.compare(passwordActual, usuario.password)
+                    const usuario = resultados[0]
+                    const passwordValida = await bcrypt.compare(passwordActual, usuario.password)
 
-                if (!passwordValida) {
-                    return res.status(400).json({ error: "Contraseña actual incorrecta" })
-                }
-
-                const hash = await bcrypt.hash(passwordNueva, 10)
-
-                conexion.query(
-                    "UPDATE usuarios SET password = ? WHERE id = ?",
-                    [hash, decoded.id],
-                    function(error) {
-                        if (error) return res.status(500).json({ error: "Error al actualizar" })
-                        res.json({ mensaje: "Contraseña actualizada correctamente" })
+                    if (!passwordValida) {
+                        return res.status(400).json({ error: "Contraseña actual incorrecta" })
                     }
-                )
-            }
-        )
-    } catch (error) {
-        res.status(401).json({ error: "Token inválido" })
-    }
-})
+
+                    const hash = await bcrypt.hash(passwordNueva, 10)
+
+                    conexion.query(
+                        "UPDATE usuarios SET password = ? WHERE id = ?",
+                        [hash, decoded.id],
+                        function(error) {
+                            if (error) return res.status(500).json({ error: "Error al actualizar" })
+                            res.json({ mensaje: "Contraseña actualizada correctamente" })
+                        }
+                    )
+                }
+            )
+        } catch (error) {
+            res.status(401).json({ error: "Token inválido" })
+        }
+    })
+
     return router
 }
