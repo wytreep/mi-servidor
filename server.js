@@ -5,6 +5,7 @@ const cors = require("cors")
 const app = express()
 
 app.use(cors())
+app.set("trust proxy", 1)
 app.use(express.json())
 const rateLimit = require("express-rate-limit")
 
@@ -232,6 +233,151 @@ app.get("/resenas/:producto_id", verificarToken, function(req, res) {
             res.json(resultados)
         }
     )
+})
+
+//Admin 
+const { verificarToken, soloAdmin, soloSuperAdmin } = require("./middleware")
+const crypto = require("crypto")
+
+// Generar invitación
+app.post("/invitaciones", verificarToken, soloSuperAdmin, function(req, res) {
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: "Email requerido" })
+
+    const token = crypto.randomBytes(32).toString("hex")
+    const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    conexion.query(
+        "INSERT INTO invitaciones (email, token, expires_at) VALUES (?, ?, ?)",
+        [email, token, expires_at],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al generar invitación" })
+            res.json({
+                mensaje: "Invitación generada",
+                link: `${req.headers.origin}/src/views/activar.html?token=${token}`
+            })
+        }
+    )
+})
+
+// Verificar token de invitación
+app.get("/invitaciones/:token", function(req, res) {
+    conexion.query(
+        "SELECT * FROM invitaciones WHERE token = ? AND usado = 0 AND expires_at > NOW()",
+        [req.params.token],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al verificar" })
+            if (resultados.length === 0) return res.status(404).json({ error: "Link inválido o expirado" })
+            res.json({ email: resultados[0].email })
+        }
+    )
+})
+
+// Activar cuenta con invitación
+app.post("/invitaciones/:token/activar", async function(req, res) {
+    const { nombre, password } = req.body
+
+    conexion.query(
+        "SELECT * FROM invitaciones WHERE token = ? AND usado = 0 AND expires_at > NOW()",
+        [req.params.token],
+        async function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al verificar" })
+            if (resultados.length === 0) return res.status(404).json({ error: "Link inválido o expirado" })
+
+            const invitacion = resultados[0]
+            const bcrypt = require("bcryptjs")
+            const hash = await bcrypt.hash(password, 10)
+
+            conexion.query(
+                "INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, 'admin')",
+                [nombre, invitacion.email, hash],
+                function(error) {
+                    if (error) {
+                        if (error.code === "ER_DUP_ENTRY") {
+                            return res.status(400).json({ error: "Este email ya tiene una cuenta" })
+                        }
+                        return res.status(500).json({ error: "Error al crear cuenta" })
+                    }
+
+                    conexion.query("UPDATE invitaciones SET usado = 1 WHERE token = ?", [req.params.token])
+                    res.json({ mensaje: "Cuenta activada correctamente" })
+                }
+            )
+        }
+    )
+})
+
+// Solicitar cambio de datos
+app.post("/solicitudes-cambio", verificarToken, function(req, res) {
+    const { campo, valor_nuevo } = req.body
+    const usuario_id = req.usuario.id
+
+    conexion.query(
+        "INSERT INTO solicitudes_cambio (usuario_id, campo, valor_nuevo) VALUES (?, ?, ?)",
+        [usuario_id, campo, valor_nuevo],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al enviar solicitud" })
+            res.json({ mensaje: "Solicitud enviada al administrador principal" })
+        }
+    )
+})
+
+// Ver solicitudes pendientes
+app.get("/solicitudes-cambio", verificarToken, soloSuperAdmin, function(req, res) {
+    conexion.query(
+        `SELECT s.id, s.campo, s.valor_nuevo, s.estado, s.created_at, u.nombre, u.email
+        FROM solicitudes_cambio s
+        JOIN usuarios u ON s.usuario_id = u.id
+        WHERE s.estado = 'pendiente'
+        ORDER BY s.created_at DESC`,
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al obtener solicitudes" })
+            res.json(resultados)
+        }
+    )
+})
+
+// Aprobar o rechazar solicitud
+app.put("/solicitudes-cambio/:id", verificarToken, soloSuperAdmin, async function(req, res) {
+    const { estado } = req.body
+
+    if (estado === "aprobado") {
+        conexion.query(
+            `SELECT s.*, u.id as uid FROM solicitudes_cambio s 
+            JOIN usuarios u ON s.usuario_id = u.id 
+            WHERE s.id = ?`,
+            [req.params.id],
+            async function(error, resultados) {
+                if (error) return res.status(500).json({ error: "Error" })
+                const solicitud = resultados[0]
+
+                let valor = solicitud.valor_nuevo
+                if (solicitud.campo === "password") {
+                    const bcrypt = require("bcryptjs")
+                    valor = await bcrypt.hash(valor, 10)
+                }
+
+                conexion.query(
+                    `UPDATE usuarios SET ${solicitud.campo} = ? WHERE id = ?`,
+                    [valor, solicitud.uid],
+                    function(error) {
+                        if (error) return res.status(500).json({ error: "Error al actualizar" })
+                        conexion.query("UPDATE solicitudes_cambio SET estado = 'aprobado' WHERE id = ?", [req.params.id])
+                        res.json({ mensaje: "Solicitud aprobada" })
+                    }
+                )
+            }
+        )
+    } else {
+        conexion.query(
+            "UPDATE solicitudes_cambio SET estado = 'rechazado' WHERE id = ?",
+            [req.params.id],
+            function(error) {
+                if (error) return res.status(500).json({ error: "Error" })
+                res.json({ mensaje: "Solicitud rechazada" })
+            }
+        )
+    }
 })
 
 app.listen(PORT, function() {
