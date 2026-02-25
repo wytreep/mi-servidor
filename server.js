@@ -6,6 +6,22 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
+const rateLimit = require("express-rate-limit")
+
+const limitadorGeneral = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: "Demasiadas solicitudes, intenta de nuevo en 15 minutos" }
+})
+
+const limitadorLogin = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: "Demasiados intentos de login, intenta de nuevo en 15 minutos" }
+})
+
+app.use(limitadorGeneral)
+app.use("/auth/login", limitadorLogin)
 app.use("/public", express.static("public"))
 
 const PORT = process.env.PORT || 3000
@@ -109,8 +125,8 @@ app.post("/pedidos", verificarToken, function(req, res) {
 app.get("/pedidos", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
         `SELECT p.id, p.total, p.estado, p.created_at, u.nombre as usuario 
-         FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
-         ORDER BY p.created_at DESC`,
+        FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
+        ORDER BY p.created_at DESC`,
         function(error, resultados) {
             if (error) return res.status(500).json({ error: "Error al obtener pedidos" })
             res.json(resultados)
