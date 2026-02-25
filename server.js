@@ -236,7 +236,7 @@ app.get("/resenas/:producto_id", verificarToken, function(req, res) {
 })
 
 //Admin 
-const { verificarToken, soloAdmin, soloSuperAdmin } = require("./middleware")
+const { soloSuperAdmin } = require("./middleware")
 const crypto = require("crypto")
 
 // Generar invitación
