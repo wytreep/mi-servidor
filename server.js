@@ -196,6 +196,43 @@ app.put("/usuarios/:id/rol", verificarToken, soloAdmin, function(req, res) {
         res.json({ mensaje: "Rol actualizado" })
     })
 })
+app.post("/resenas", verificarToken, function(req, res) {
+    const { producto_id, calificacion, comentario } = req.body
+    const usuario_id = req.usuario.id
+
+    if (calificacion < 1 || calificacion > 5) {
+        return res.status(400).json({ error: "La calificación debe ser entre 1 y 5" })
+    }
+
+    conexion.query(
+        "INSERT INTO resenas (producto_id, usuario_id, calificacion, comentario) VALUES (?, ?, ?, ?)",
+        [producto_id, usuario_id, calificacion, comentario],
+        function(error) {
+            if (error) {
+                if (error.code === "ER_DUP_ENTRY") {
+                    return res.status(400).json({ error: "Ya dejaste una reseña para este producto" })
+                }
+                return res.status(500).json({ error: "Error al guardar reseña" })
+            }
+            res.json({ mensaje: "Reseña guardada correctamente" })
+        }
+    )
+})
+
+app.get("/resenas/:producto_id", verificarToken, function(req, res) {
+    conexion.query(
+        `SELECT r.id, r.calificacion, r.comentario, r.created_at, u.nombre
+        FROM resenas r
+        JOIN usuarios u ON r.usuario_id = u.id
+        WHERE r.producto_id = ?
+        ORDER BY r.created_at DESC`,
+        [req.params.producto_id],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al obtener reseñas" })
+            res.json(resultados)
+        }
+    )
+})
 
 app.listen(PORT, function() {
     console.log("Servidor corriendo en http://localhost:" + PORT)
