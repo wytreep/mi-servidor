@@ -234,6 +234,30 @@ app.get("/resenas/:producto_id", verificarToken, function(req, res) {
         }
     )
 })
+// Rutas para administración de usuarios y solicitudes de cambio
+app.put("/auth/cambiar-dato", verificarToken, soloSuperAdmin, async function(req, res) {
+    const { campo, valor } = req.body
+    const camposPermitidos = ["nombre", "password"]
+    
+    if (!camposPermitidos.includes(campo)) {
+        return res.status(400).json({ error: "Campo no permitido" })
+    }
+
+    let valorFinal = valor
+    if (campo === "password") {
+        const bcrypt = require("bcryptjs")
+        valorFinal = await bcrypt.hash(valor, 10)
+    }
+
+    conexion.query(
+        `UPDATE usuarios SET ${campo} = ? WHERE id = ?`,
+        [valorFinal, req.usuario.id],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al actualizar" })
+            res.json({ mensaje: campo === "password" ? "Contraseña actualizada" : "Nombre actualizado" })
+        }
+    )
+})
 
 //Admin 
 const { soloSuperAdmin } = require("./middleware")
