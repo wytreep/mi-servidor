@@ -234,6 +234,48 @@ app.get("/resenas/:producto_id", verificarToken, function(req, res) {
         }
     )
 })
+// Rutas para cancelar pedidos
+app.put("/mis-pedidos/:id/cancelar", verificarToken, function(req, res) {
+    const usuario_id = req.usuario.id
+
+    conexion.query(
+        "SELECT * FROM pedidos WHERE id = ? AND usuario_id = ?",
+        [req.params.id, usuario_id],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al buscar pedido" })
+            if (resultados.length === 0) return res.status(404).json({ error: "Pedido no encontrado" })
+
+            const pedido = resultados[0]
+            if (pedido.estado !== "pendiente") {
+                return res.status(400).json({ error: "Solo puedes cancelar pedidos pendientes" })
+            }
+
+            conexion.query(
+                "UPDATE pedidos SET estado = 'cancelado' WHERE id = ?",
+                [req.params.id],
+                function(error) {
+                    if (error) return res.status(500).json({ error: "Error al cancelar" })
+
+                    // Devolver stock
+                    conexion.query(
+                        "SELECT * FROM pedido_items WHERE pedido_id = ?",
+                        [req.params.id],
+                        function(error, items) {
+                            items.forEach(function(item) {
+                                conexion.query(
+                                    "UPDATE productos SET stock = stock + ? WHERE id = ?",
+                                    [item.cantidad, item.producto_id]
+                                )
+                            })
+                        }
+                    )
+
+                    res.json({ mensaje: "Pedido cancelado correctamente" })
+                }
+            )
+        }
+    )
+})
 // Rutas para cambiar nombre
 app.put("/auth/cambiar-nombre", verificarToken, function(req, res) {
     const { nombre } = req.body
