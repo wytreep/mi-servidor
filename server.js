@@ -276,6 +276,32 @@ app.put("/mis-pedidos/:id/cancelar", verificarToken, function(req, res) {
         }
     )
 })
+// Rutas para reseñas
+app.get("/resenas", verificarToken, soloAdmin, function(req, res) {
+    conexion.query(
+        `SELECT r.id, r.calificacion, r.comentario, r.created_at,
+         u.nombre as usuario, p.nombre as producto
+         FROM resenas r
+         JOIN usuarios u ON r.usuario_id = u.id
+         JOIN productos p ON r.producto_id = p.id
+         ORDER BY r.created_at DESC`,
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al obtener reseñas" })
+            res.json(resultados)
+        }
+    )
+})
+
+app.delete("/resenas/:id", verificarToken, soloAdmin, function(req, res) {
+    conexion.query(
+        "DELETE FROM resenas WHERE id = ?",
+        [req.params.id],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al eliminar reseña" })
+            res.json({ mensaje: "Reseña eliminada" })
+        }
+    )
+})
 // Rutas para cambiar nombre
 app.put("/auth/cambiar-nombre", verificarToken, function(req, res) {
     const { nombre } = req.body
