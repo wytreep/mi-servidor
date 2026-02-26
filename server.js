@@ -302,6 +302,78 @@ app.delete("/resenas/:id", verificarToken, soloAdmin, function(req, res) {
         }
     )
 })
+// Dar like a reseña
+app.post("/resenas/:id/like", verificarToken, function(req, res) {
+    conexion.query(
+        "INSERT INTO resenas_likes (resena_id, usuario_id) VALUES (?, ?)",
+        [req.params.id, req.usuario.id],
+        function(error) {
+            if (error && error.code === "ER_DUP_ENTRY") {
+                // Ya dio like, quitarlo
+                conexion.query(
+                    "DELETE FROM resenas_likes WHERE resena_id = ? AND usuario_id = ?",
+                    [req.params.id, req.usuario.id],
+                    function(error) {
+                        if (error) return res.status(500).json({ error: "Error" })
+                        res.json({ mensaje: "Like quitado", liked: false })
+                    }
+                )
+                return
+            }
+            if (error) return res.status(500).json({ error: "Error" })
+            res.json({ mensaje: "Like agregado", liked: true })
+        }
+    )
+})
+
+// Obtener respuestas de una reseña
+app.get("/resenas/:id/respuestas", verificarToken, function(req, res) {
+    conexion.query(
+        `SELECT r.id, r.comentario, r.es_admin, r.created_at, u.nombre
+         FROM resenas_respuestas r
+         JOIN usuarios u ON r.usuario_id = u.id
+         WHERE r.resena_id = ?
+         ORDER BY r.created_at ASC`,
+        [req.params.id],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error" })
+            res.json(resultados)
+        }
+    )
+})
+
+// Responder reseña
+app.post("/resenas/:id/respuestas", verificarToken, function(req, res) {
+    const { comentario } = req.body
+    const es_admin = req.usuario.rol === "admin" || req.usuario.rol === "superadmin" ? 1 : 0
+
+    conexion.query(
+        "INSERT INTO resenas_respuestas (resena_id, usuario_id, comentario, es_admin) VALUES (?, ?, ?, ?)",
+        [req.params.id, req.usuario.id, comentario, es_admin],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al responder" })
+            res.json({ mensaje: "Respuesta agregada" })
+        }
+    )
+})
+
+// Contar likes de una reseña
+app.get("/resenas/:id/likes", verificarToken, function(req, res) {
+    conexion.query(
+        "SELECT COUNT(*) as total FROM resenas_likes WHERE resena_id = ?",
+        [req.params.id],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error" })
+            conexion.query(
+                "SELECT * FROM resenas_likes WHERE resena_id = ? AND usuario_id = ?",
+                [req.params.id, req.usuario.id],
+                function(error, liked) {
+                    res.json({ total: resultados[0].total, liked: liked.length > 0 })
+                }
+            )
+        }
+    )
+})
 // Rutas para cambiar nombre
 app.put("/auth/cambiar-nombre", verificarToken, function(req, res) {
     const { nombre } = req.body
