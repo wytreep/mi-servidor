@@ -43,7 +43,7 @@ conexion.connect(function(error) {
     console.log("Conectado a MySQL correctamente")
 })
 
-const { verificarToken, soloAdmin } = require("./middleware")
+const { verificarToken, soloAdmin, soloSuperAdmin } = require("./middleware")
 const authRoutes = require("./auth")
 const upload = require("./uploads")
 
@@ -274,7 +274,7 @@ app.put("/auth/cambiar-dato", verificarToken, soloSuperAdmin, async function(req
 })
 
 //Admin 
-const { soloSuperAdmin } = require("./middleware")
+
 const crypto = require("crypto")
 
 // Generar invitación
