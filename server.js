@@ -234,6 +234,20 @@ app.get("/resenas/:producto_id", verificarToken, function(req, res) {
         }
     )
 })
+// Rutas para cambiar nombre
+app.put("/auth/cambiar-nombre", verificarToken, function(req, res) {
+    const { nombre } = req.body
+    if (!nombre) return res.status(400).json({ error: "Nombre requerido" })
+
+    conexion.query(
+        "UPDATE usuarios SET nombre = ? WHERE id = ?",
+        [nombre, req.usuario.id],
+        function(error) {
+            if (error) return res.status(500).json({ error: "Error al actualizar" })
+            res.json({ mensaje: "Nombre actualizado correctamente" })
+        }
+    )
+})
 // Rutas para administración de usuarios y solicitudes de cambio
 app.put("/auth/cambiar-dato", verificarToken, soloSuperAdmin, async function(req, res) {
     const { campo, valor } = req.body
