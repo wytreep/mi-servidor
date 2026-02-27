@@ -99,15 +99,19 @@ app.delete("/productos/:id", verificarToken, soloAdmin, function(req, res) {
 })
 
 app.post("/pedidos", verificarToken, function(req, res) {
-    const { items, total } = req.body
+    const { items, total, tipo_envio, destinatario, cedula, telefono, departamento, ciudad, barrio, direccion, indicaciones } = req.body
     const usuario_id = req.usuario.id
+
     conexion.query(
-        "INSERT INTO pedidos (usuario_id, total) VALUES (?, ?)",
-        [usuario_id, total],
+        `INSERT INTO pedidos (usuario_id, total, tipo_envio, destinatario, cedula, telefono, departamento, ciudad, barrio, direccion, indicaciones) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [usuario_id, total, tipo_envio, destinatario, cedula, telefono, departamento, ciudad, barrio, direccion, indicaciones],
         function(error, resultado) {
             if (error) return res.status(500).json({ error: "Error al crear pedido" })
+
             const pedido_id = resultado.insertId
             const valores = items.map(item => [pedido_id, item.id, item.nombre, item.precio, item.cantidad])
+
             conexion.query(
                 "INSERT INTO pedido_items (pedido_id, producto_id, nombre, precio, cantidad) VALUES ?",
                 [valores],
@@ -125,9 +129,12 @@ app.post("/pedidos", verificarToken, function(req, res) {
 
 app.get("/pedidos", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
-        `SELECT p.id, p.total, p.estado, p.created_at, u.nombre as usuario 
-        FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
-        ORDER BY p.created_at DESC`,
+        `SELECT p.id, p.total, p.estado, p.created_at, p.tipo_envio,
+         p.destinatario, p.cedula, p.telefono, p.departamento, p.ciudad, 
+         p.barrio, p.direccion, p.indicaciones,
+         u.nombre as usuario, u.email as email_usuario
+         FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
+         ORDER BY p.created_at DESC`,
         function(error, resultados) {
             if (error) return res.status(500).json({ error: "Error al obtener pedidos" })
             res.json(resultados)
