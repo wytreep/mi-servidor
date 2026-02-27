@@ -174,6 +174,7 @@ app.get("/mis-pedidos", verificarToken, function(req, res) {
     )
 })
 // Agregar este endpoint en server.js
+// Agregar este endpoint en server.js
 app.get("/pedidos/:id/items", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
         "SELECT * FROM pedido_items WHERE pedido_id = ?",
