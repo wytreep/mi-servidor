@@ -127,18 +127,20 @@ app.post("/pedidos", verificarToken, function(req, res) {
     )
 })
 
-// Agregar este endpoint en server.js
-app.get("/pedidos/:id/items", verificarToken, soloAdmin, function(req, res) {
+app.get("/pedidos", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
-        "SELECT * FROM pedido_items WHERE pedido_id = ?",
-        [req.params.id],
+        `SELECT p.id, p.total, p.estado, p.created_at, p.tipo_envio,
+         p.destinatario, p.cedula, p.telefono, p.departamento, p.ciudad,
+         p.barrio, p.direccion, p.indicaciones,
+         u.nombre as usuario, u.email as email_usuario
+         FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
+         ORDER BY p.created_at DESC`,
         function(error, resultados) {
-            if (error) return res.status(500).json({ error: "Error al obtener items" });
-            res.json(resultados);
+            if (error) return res.status(500).json({ error: "Error al obtener pedidos" })
+            res.json(resultados)
         }
-    );
-});
-
+    )
+})
 app.put("/pedidos/:id", verificarToken, soloAdmin, function(req, res) {
     conexion.query("UPDATE pedidos SET estado = ? WHERE id = ?", [req.body.estado, req.params.id], function(error) {
         if (error) return res.status(500).json({ error: "Error al actualizar" })
@@ -456,6 +458,32 @@ app.put("/auth/cambiar-dato", verificarToken, soloSuperAdmin, async function(req
         function(error) {
             if (error) return res.status(500).json({ error: "Error al actualizar" })
             res.json({ mensaje: campo === "password" ? "Contraseña actualizada" : "Nombre actualizado" })
+        }
+    )
+})
+//cambiar contraseña con contraseña actual
+app.put("/auth/cambiar-password", verificarToken, async function(req, res) {
+    const { passwordActual, passwordNueva } = req.body
+    const bcrypt = require("bcryptjs")
+
+    conexion.query(
+        "SELECT password FROM usuarios WHERE id = ?",
+        [req.usuario.id],
+        async function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al buscar usuario" })
+
+            const valido = await bcrypt.compare(passwordActual, resultados[0].password)
+            if (!valido) return res.status(400).json({ error: "Contraseña actual incorrecta" })
+
+            const hash = await bcrypt.hash(passwordNueva, 10)
+            conexion.query(
+                "UPDATE usuarios SET password = ? WHERE id = ?",
+                [hash, req.usuario.id],
+                function(error) {
+                    if (error) return res.status(500).json({ error: "Error al actualizar" })
+                    res.json({ mensaje: "Contraseña actualizada correctamente" })
+                }
+            )
         }
     )
 })
