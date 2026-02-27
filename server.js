@@ -173,6 +173,17 @@ app.get("/mis-pedidos", verificarToken, function(req, res) {
         }
     )
 })
+// Agregar este endpoint en server.js
+app.get("/pedidos/:id/items", verificarToken, soloAdmin, function(req, res) {
+    conexion.query(
+        "SELECT * FROM pedido_items WHERE pedido_id = ?",
+        [req.params.id],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al obtener items" });
+            res.json(resultados);
+        }
+    );
+});
 
 app.get("/estadisticas", verificarToken, soloAdmin, function(req, res) {
     const stats = {}
