@@ -127,20 +127,17 @@ app.post("/pedidos", verificarToken, function(req, res) {
     )
 })
 
-app.get("/pedidos", verificarToken, soloAdmin, function(req, res) {
+// Agregar este endpoint en server.js
+app.get("/pedidos/:id/items", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
-        `SELECT p.id, p.total, p.estado, p.created_at, p.tipo_envio,
-         p.destinatario, p.cedula, p.telefono, p.departamento, p.ciudad, 
-         p.barrio, p.direccion, p.indicaciones,
-         u.nombre as usuario, u.email as email_usuario
-         FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id 
-         ORDER BY p.created_at DESC`,
+        "SELECT * FROM pedido_items WHERE pedido_id = ?",
+        [req.params.id],
         function(error, resultados) {
-            if (error) return res.status(500).json({ error: "Error al obtener pedidos" })
-            res.json(resultados)
+            if (error) return res.status(500).json({ error: "Error al obtener items" });
+            res.json(resultados);
         }
-    )
-})
+    );
+});
 
 app.put("/pedidos/:id", verificarToken, soloAdmin, function(req, res) {
     conexion.query("UPDATE pedidos SET estado = ? WHERE id = ?", [req.body.estado, req.params.id], function(error) {
@@ -173,18 +170,6 @@ app.get("/mis-pedidos", verificarToken, function(req, res) {
         }
     )
 })
-// Agregar este endpoint en server.js
-// Agregar este endpoint en server.js
-app.get("/pedidos/:id/items", verificarToken, soloAdmin, function(req, res) {
-    conexion.query(
-        "SELECT * FROM pedido_items WHERE pedido_id = ?",
-        [req.params.id],
-        function(error, resultados) {
-            if (error) return res.status(500).json({ error: "Error al obtener items" });
-            res.json(resultados);
-        }
-    );
-});
 
 app.get("/estadisticas", verificarToken, soloAdmin, function(req, res) {
     const stats = {}
