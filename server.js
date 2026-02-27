@@ -222,15 +222,37 @@ app.post("/resenas", verificarToken, function(req, res) {
 
 app.get("/resenas/:producto_id", verificarToken, function(req, res) {
     conexion.query(
-        `SELECT r.id, r.calificacion, r.comentario, r.created_at, u.nombre
-        FROM resenas r
-        JOIN usuarios u ON r.usuario_id = u.id
-        WHERE r.producto_id = ?
-        ORDER BY r.created_at DESC`,
-        [req.params.producto_id],
-        function(error, resultados) {
+        `SELECT r.id, r.calificacion, r.comentario, r.created_at, u.nombre,
+         (SELECT COUNT(*) FROM resenas_likes WHERE resena_id = r.id) as likes,
+         (SELECT COUNT(*) > 0 FROM resenas_likes WHERE resena_id = r.id AND usuario_id = ?) as liked
+         FROM resenas r
+         JOIN usuarios u ON r.usuario_id = u.id
+         WHERE r.producto_id = ?
+         ORDER BY r.created_at DESC`,
+        [req.usuario.id, req.params.producto_id],
+        function(error, resenas) {
             if (error) return res.status(500).json({ error: "Error al obtener reseñas" })
-            res.json(resultados)
+
+            if (resenas.length === 0) return res.json([])
+
+            let completados = 0
+            const resultado = []
+
+            resenas.forEach(function(resena) {
+                conexion.query(
+                    `SELECT rr.id, rr.comentario, rr.es_admin, rr.created_at, u.nombre
+                     FROM resenas_respuestas rr
+                     JOIN usuarios u ON rr.usuario_id = u.id
+                     WHERE rr.resena_id = ?
+                     ORDER BY rr.created_at ASC`,
+                    [resena.id],
+                    function(error, respuestas) {
+                        resultado.push({ ...resena, respuestas: respuestas || [] })
+                        completados++
+                        if (completados === resenas.length) res.json(resultado)
+                    }
+                )
+            })
         }
     )
 })
@@ -280,14 +302,35 @@ app.put("/mis-pedidos/:id/cancelar", verificarToken, function(req, res) {
 app.get("/resenas", verificarToken, soloAdmin, function(req, res) {
     conexion.query(
         `SELECT r.id, r.calificacion, r.comentario, r.created_at,
-         u.nombre as usuario, p.nombre as producto
+         u.nombre as usuario, p.nombre as producto,
+         (SELECT COUNT(*) FROM resenas_likes WHERE resena_id = r.id) as likes
          FROM resenas r
          JOIN usuarios u ON r.usuario_id = u.id
          JOIN productos p ON r.producto_id = p.id
          ORDER BY r.created_at DESC`,
-        function(error, resultados) {
+        function(error, resenas) {
             if (error) return res.status(500).json({ error: "Error al obtener reseñas" })
-            res.json(resultados)
+
+            if (resenas.length === 0) return res.json([])
+
+            let completados = 0
+            const resultado = []
+
+            resenas.forEach(function(resena) {
+                conexion.query(
+                    `SELECT rr.id, rr.comentario, rr.es_admin, rr.created_at, u.nombre
+                     FROM resenas_respuestas rr
+                     JOIN usuarios u ON rr.usuario_id = u.id
+                     WHERE rr.resena_id = ?
+                     ORDER BY rr.created_at ASC`,
+                    [resena.id],
+                    function(error, respuestas) {
+                        resultado.push({ ...resena, respuestas: respuestas || [] })
+                        completados++
+                        if (completados === resenas.length) res.json(resultado)
+                    }
+                )
+            })
         }
     )
 })
