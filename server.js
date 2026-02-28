@@ -76,7 +76,7 @@ app.get("/productos/:id", verificarToken, function(req, res) {
 
 app.post("/productos", verificarToken, soloAdmin, upload.single("imagen"), function(req, res) {
     let { nombre, precio, stock, descripcion, categoria } = req.body
-    let imagen = req.file ? "/public/imagenes/" + req.file.filename : null
+    let imagen = req.file ? req.file.path : null
     conexion.query(
         "INSERT INTO productos (nombre, precio, stock, descripcion, categoria, imagen) VALUES (?, ?, ?, ?, ?, ?)",
         [nombre, precio, stock, descripcion, categoria, imagen],
@@ -89,7 +89,7 @@ app.post("/productos", verificarToken, soloAdmin, upload.single("imagen"), funct
 
 app.put("/productos/:id", verificarToken, soloAdmin, upload.single("imagen"), function(req, res) {
     let { nombre, precio, stock, descripcion, categoria } = req.body
-    let imagen = req.file ? "/public/imagenes/" + req.file.filename : null
+    let imagen = req.file ? req.file.path : null
     let query = "UPDATE productos SET nombre=?, precio=?, stock=?, descripcion=?, categoria=?"
     let params = [nombre, precio, stock, descripcion, categoria]
     if (imagen) { query += ", imagen=?"; params.push(imagen) }
