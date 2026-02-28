@@ -15,7 +15,6 @@ app.use(cors({
     credentials: true
 }))
 
-app.options("/(.*)", cors())
 app.set("trust proxy", 1)
 app.use(express.json())
 const rateLimit = require("express-rate-limit")
