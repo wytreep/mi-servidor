@@ -1,9 +1,16 @@
 const multer = require("multer")
 const path = require("path")
+const fs = require("fs")
+
+// Crear carpeta si no existe
+const carpeta = "public/imagenes/"
+if (!fs.existsSync(carpeta)) {
+    fs.mkdirSync(carpeta, { recursive: true })
+}
 
 const storage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, "public/imagenes/")
+        cb(null, carpeta)
     },
     filename: function(req, file, cb) {
         cb(null, Date.now() + path.extname(file.originalname))
