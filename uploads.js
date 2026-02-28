@@ -16,7 +16,7 @@ const upload = multer({
     fileFilter: function(req, file, cb) {
         const tipos = /jpeg|jpg|png|webp/
         const valido = tipos.test(path.extname(file.originalname).toLowerCase())
-        if (valido) cb(null, express.static)
+        if (valido) cb(null, true)
         else cb(new Error("Solo se permiten imágenes"))
     }
 })
