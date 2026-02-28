@@ -4,7 +4,18 @@ const mysql = require("mysql2")
 const cors = require("cors")
 const app = express()
 
-app.use(cors())
+app.use(cors({
+    origin: [
+        "https://tienda-fullstack-uqcv.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5500"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "authorization"],
+    credentials: true
+}))
+
+app.options("*", cors())
 app.set("trust proxy", 1)
 app.use(express.json())
 const rateLimit = require("express-rate-limit")
