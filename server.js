@@ -111,13 +111,91 @@ app.delete("/productos/:id", verificarToken, soloAdmin, function(req, res) {
 })
 const { crearPreferencia } = require("./mercadopago")
 
+// Verificar cupón
+app.post("/cupones/verificar", verificarToken, function(req, res) {
+    const { codigo, total } = req.body
+
+    conexion.query(
+        `SELECT * FROM cupones WHERE codigo = ? AND activo = 1 
+         AND (expires_at IS NULL OR expires_at > NOW())
+         AND usos_actuales < usos_maximos`,
+        [codigo],
+        function(error, resultados) {
+            if (error) return res.status(500).json({ error: "Error al verificar cupón" })
+            if (!resultados.length) return res.status(404).json({ error: "Cupón inválido o expirado" })
+
+            const cupon = resultados[0]
+
+            if (Number(total) < Number(cupon.minimo_compra)) {
+                return res.status(400).json({ 
+                    error: `Mínimo de compra: $${Number(cupon.minimo_compra).toLocaleString()}` 
+                })
+            }
+
+            const descuento = cupon.tipo === "porcentaje"
+                ? Math.round(Number(total) * cupon.valor / 100)
+                : Number(cupon.valor)
+
+            res.json({
+                valido: true,
+                codigo: cupon.codigo,
+                tipo: cupon.tipo,
+                valor: cupon.valor,
+                descuento,
+                total_final: Number(total) - descuento
+            })
+        }
+    )
+})
+
+// Cupones admin - listar
+app.get("/cupones", verificarToken, soloAdmin, function(req, res) {
+    conexion.query("SELECT * FROM cupones ORDER BY created_at DESC", function(error, resultados) {
+        if (error) return res.status(500).json({ error: "Error al obtener cupones" })
+        res.json(resultados)
+    })
+})
+
+// Cupones admin - crear
+app.post("/cupones", verificarToken, soloAdmin, function(req, res) {
+    const { codigo, tipo, valor, minimo_compra, usos_maximos, expires_at } = req.body
+    conexion.query(
+        "INSERT INTO cupones (codigo, tipo, valor, minimo_compra, usos_maximos, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [codigo.toUpperCase(), tipo, valor, minimo_compra || 0, usos_maximos || 1, expires_at || null],
+        function(error) {
+            if (error) {
+                if (error.code === "ER_DUP_ENTRY") return res.status(400).json({ error: "El código ya existe" })
+                return res.status(500).json({ error: "Error al crear cupón" })
+            }
+            res.json({ mensaje: "Cupón creado correctamente" })
+        }
+    )
+})
+
+// Cupones admin - toggle activo
+app.put("/cupones/:id", verificarToken, soloAdmin, function(req, res) {
+    const { activo } = req.body
+    conexion.query("UPDATE cupones SET activo = ? WHERE id = ?", [activo, req.params.id], function(error) {
+        if (error) return res.status(500).json({ error: "Error al actualizar" })
+        res.json({ mensaje: "Cupón actualizado" })
+    })
+})
+
+// Cupones admin - eliminar
+app.delete("/cupones/:id", verificarToken, soloAdmin, function(req, res) {
+    conexion.query("DELETE FROM cupones WHERE id = ?", [req.params.id], function(error) {
+        if (error) return res.status(500).json({ error: "Error al eliminar" })
+        res.json({ mensaje: "Cupón eliminado" })
+    })
+})
+
 // Crear preferencia de pago
 // Almacén temporal de pedidos pendientes de pago
 const pedidosPendientes = {}
 
 app.post("/mp/crear-preferencia", verificarToken, async function(req, res) {
     const { items, total, tipo_envio, destinatario, cedula, telefono, 
-            departamento, ciudad, barrio, direccion, indicaciones } = req.body
+            departamento, ciudad, barrio, direccion, indicaciones, total_final } = req.body
     const usuario_id = req.usuario.id
     const usuario_email = req.usuario.email || ""
     const usuario_nombre = req.usuario.nombre || ""
@@ -133,7 +211,7 @@ app.post("/mp/crear-preferencia", verificarToken, async function(req, res) {
         // Guardar datos del pedido temporalmente
         pedidosPendientes[preferencia.id] = {
             usuario_id, usuario_email, usuario_nombre,
-            items, total, tipo_envio, destinatario, cedula,
+            items, total: total_final || total, tipo_envio, destinatario, cedula,
             telefono, departamento, ciudad, barrio, direccion, indicaciones
         }
 
