@@ -1,16 +1,8 @@
-const nodemailer = require("nodemailer")
-
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS
-    }
-})
+const { Resend } = require("resend")
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 async function enviarConfirmacionPedido(pedido) {
     const { email, nombre, id, total, items, tipo_envio, destinatario, direccion, ciudad, departamento, barrio } = pedido
-
     const itemsHtml = items.map(item => `
         <tr>
             <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:14px">${item.nombre}</td>
@@ -95,8 +87,8 @@ async function enviarConfirmacionPedido(pedido) {
     </html>
     `
 
-    await transporter.sendMail({
-        from: `"Tu Tienda" <${process.env.GMAIL_USER}>`,
+    await resend.emails.send({
+        from: "Tu Tienda <onboarding@resend.dev>",
         to: email,
         subject: `✅ Pedido #${id} confirmado — $${Number(total).toLocaleString()}`,
         html
@@ -139,8 +131,8 @@ async function enviarActualizacionEstado(pedido) {
     </html>
     `
 
-    await transporter.sendMail({
-        from: `"Tu Tienda" <${process.env.GMAIL_USER}>`,
+    await resend.emails.send({
+        from: "Tu Tienda <onboarding@resend.dev>",
         to: email,
         subject: `${info.emoji} Pedido #${id} — ${estado}`,
         html
