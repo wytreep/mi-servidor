@@ -112,17 +112,31 @@ app.delete("/productos/:id", verificarToken, soloAdmin, function(req, res) {
 const { crearPreferencia } = require("./mercadopago")
 
 // Crear preferencia de pago
+// Almacén temporal de pedidos pendientes de pago
+const pedidosPendientes = {}
+
 app.post("/mp/crear-preferencia", verificarToken, async function(req, res) {
-    const { items, pedido_id } = req.body
+    const { items, total, tipo_envio, destinatario, cedula, telefono, 
+            departamento, ciudad, barrio, direccion, indicaciones } = req.body
+    const usuario_id = req.usuario.id
     const usuario_email = req.usuario.email || ""
+    const usuario_nombre = req.usuario.nombre || ""
 
     try {
         const preferencia = await crearPreferencia({
             items,
-            pedido_id,
+            pedido_id: "temp_" + Date.now(),
             usuario_email,
             back_url: "https://tienda-fullstack-uqcv.vercel.app"
         })
+
+        // Guardar datos del pedido temporalmente
+        pedidosPendientes[preferencia.id] = {
+            usuario_id, usuario_email, usuario_nombre,
+            items, total, tipo_envio, destinatario, cedula,
+            telefono, departamento, ciudad, barrio, direccion, indicaciones
+        }
+
         res.json({ init_point: preferencia.init_point, id: preferencia.id })
     } catch (error) {
         console.log("Error MP:", error.message)
@@ -138,23 +152,72 @@ app.post("/mp/webhook", async function(req, res) {
     if (type !== "payment") return
 
     try {
-        const { Payment } = require("mercadopago")
-        const { MercadoPagoConfig } = require("mercadopago")
+        const { Payment, MercadoPagoConfig } = require("mercadopago")
         const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN })
         const payment = new Payment(client)
         const pago = await payment.get({ id: data.id })
 
-        if (pago.status === "approved") {
-            const pedido_id = pago.external_reference
-            conexion.query(
-                "UPDATE pedidos SET estado = 'procesando', pagado = 1 WHERE id = ?",
-                [pedido_id],
-                function(err) {
-                    if (err) console.log("Error actualizando pedido:", err.message)
-                    else console.log("Pedido", pedido_id, "marcado como pagado")
-                }
-            )
+        console.log("Webhook pago:", pago.status, "preference:", pago.preference_id)
+
+        if (pago.status !== "approved") return
+
+        const datosPedido = pedidosPendientes[pago.preference_id]
+        if (!datosPedido) {
+            console.log("No se encontraron datos para preference:", pago.preference_id)
+            return
         }
+
+        // Crear pedido en BD
+        conexion.query(
+            `INSERT INTO pedidos (usuario_id, total, tipo_envio, destinatario, cedula, telefono, 
+             departamento, ciudad, barrio, direccion, indicaciones, pagado) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            [datosPedido.usuario_id, datosPedido.total, datosPedido.tipo_envio,
+             datosPedido.destinatario, datosPedido.cedula, datosPedido.telefono,
+             datosPedido.departamento, datosPedido.ciudad, datosPedido.barrio,
+             datosPedido.direccion, datosPedido.indicaciones],
+            function(error, resultado) {
+                if (error) { console.log("Error creando pedido:", error.message); return }
+
+                const pedido_id = resultado.insertId
+                const valores = datosPedido.items.map(item => 
+                    [pedido_id, item.id, item.nombre, item.precio, item.cantidad])
+
+                conexion.query(
+                    "INSERT INTO pedido_items (pedido_id, producto_id, nombre, precio, cantidad) VALUES ?",
+                    [valores],
+                    function(error) {
+                        if (error) { console.log("Error items:", error.message); return }
+
+                        // Descontar stock
+                        datosPedido.items.forEach(function(item) {
+                            conexion.query("UPDATE productos SET stock = stock - ? WHERE id = ?",
+                                [item.cantidad, item.id])
+                        })
+
+                        // Limpiar pendiente
+                        delete pedidosPendientes[pago.preference_id]
+
+                        console.log("Pedido", pedido_id, "creado correctamente")
+
+                        // Enviar email
+                        enviarConfirmacionPedido({
+                            email: datosPedido.usuario_email,
+                            nombre: datosPedido.usuario_nombre,
+                            id: pedido_id,
+                            total: datosPedido.total,
+                            items: datosPedido.items,
+                            tipo_envio: datosPedido.tipo_envio,
+                            destinatario: datosPedido.destinatario,
+                            direccion: datosPedido.direccion,
+                            ciudad: datosPedido.ciudad,
+                            departamento: datosPedido.departamento,
+                            barrio: datosPedido.barrio
+                        }).catch(console.error)
+                    }
+                )
+            }
+        )
     } catch (error) {
         console.log("Error webhook:", error.message)
     }
