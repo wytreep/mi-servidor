@@ -115,7 +115,7 @@ app.post("/pedidos", verificarToken, function(req, res) {
 
     conexion.query(
         `INSERT INTO pedidos (usuario_id, total, tipo_envio, destinatario, cedula, telefono, departamento, ciudad, barrio, direccion, indicaciones) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [usuario_id, total, tipo_envio, destinatario, cedula, telefono, departamento, ciudad, barrio, direccion, indicaciones],
         function(error, resultado) {
             if (error) return res.status(500).json({ error: "Error al crear pedido" })
@@ -131,7 +131,34 @@ app.post("/pedidos", verificarToken, function(req, res) {
                     items.forEach(function(item) {
                         conexion.query("UPDATE productos SET stock = stock - ? WHERE id = ?", [item.cantidad, item.id])
                     })
+                       // Después de items.forEach stock...
                     res.json({ mensaje: "Pedido creado correctamente", id: pedido_id })
+
+                    // Enviar email en background
+                    conexion.query(
+                        "SELECT email FROM usuarios WHERE id = ?",
+                        [usuario_id],
+                        function(err, users) {
+                            if (err || !users.length) return
+                            enviarConfirmacionPedido({
+                                email: users[0].email,
+                                nombre: req.usuario.nombre,
+                                id: pedido_id,
+                                total,
+                                items,
+                                tipo_envio,
+                                destinatario,
+                                direccion,
+                                ciudad,
+                                departamento,
+                                barrio
+                            }).then(() => {
+                                console.log("Email enviado a:", users[0].email)
+                            }).catch(err => {
+                                console.log("Error enviando email:", err.message)
+                            })
+                        }
+                    )
                 }
             )
         }
@@ -156,6 +183,22 @@ app.put("/pedidos/:id", verificarToken, soloAdmin, function(req, res) {
     conexion.query("UPDATE pedidos SET estado = ? WHERE id = ?", [req.body.estado, req.params.id], function(error) {
         if (error) return res.status(500).json({ error: "Error al actualizar" })
         res.json({ mensaje: "Estado actualizado" })
+
+        // Email notificación
+        conexion.query(
+            `SELECT u.email, u.nombre, p.total FROM pedidos p 
+             JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?`,
+            [req.params.id],
+            function(err, rows) {
+                if (err || !rows.length) return
+                enviarActualizacionEstado({
+                    email: rows[0].email,
+                    nombre: rows[0].nombre,
+                    id: req.params.id,
+                    estado: req.body.estado
+                }).catch(console.error)
+            }
+        )
     })
 })
 
