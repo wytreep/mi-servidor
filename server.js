@@ -18,6 +18,56 @@ app.use(cors({
 
 app.set("trust proxy", 1)
 app.use(express.json())
+const { crearPreferencia } = require("./mercadopago")
+
+// Crear preferencia de pago
+app.post("/mp/crear-preferencia", verificarToken, async function(req, res) {
+    const { items, pedido_id } = req.body
+    const usuario_email = req.usuario.email || ""
+
+    try {
+        const preferencia = await crearPreferencia({
+            items,
+            pedido_id,
+            usuario_email,
+            back_url: "https://tienda-fullstack-uqcv.vercel.app"
+        })
+        res.json({ init_point: preferencia.init_point, id: preferencia.id })
+    } catch (error) {
+        console.log("Error MP:", error.message)
+        res.status(500).json({ error: "Error al crear preferencia de pago" })
+    }
+})
+
+// Webhook de MercadoPago
+app.post("/mp/webhook", async function(req, res) {
+    const { type, data } = req.body
+    res.sendStatus(200)
+
+    if (type !== "payment") return
+
+    try {
+        const { Payment } = require("mercadopago")
+        const { MercadoPagoConfig } = require("mercadopago")
+        const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN })
+        const payment = new Payment(client)
+        const pago = await payment.get({ id: data.id })
+
+        if (pago.status === "approved") {
+            const pedido_id = pago.external_reference
+            conexion.query(
+                "UPDATE pedidos SET estado = 'procesando', pagado = 1 WHERE id = ?",
+                [pedido_id],
+                function(err) {
+                    if (err) console.log("Error actualizando pedido:", err.message)
+                    else console.log("Pedido", pedido_id, "marcado como pagado")
+                }
+            )
+        }
+    } catch (error) {
+        console.log("Error webhook:", error.message)
+    }
+})
 const rateLimit = require("express-rate-limit")
 
 const limitadorGeneral = rateLimit({
